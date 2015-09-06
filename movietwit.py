@@ -6,10 +6,62 @@ import os
 import time
 import termios
 import tty
+import socket
+import threading
+import tweepy
+import json
+from tweepy import OAuthHandler
+from tweepy import Stream
+from tweepy.streaming import StreamListener
+
+try:
+    import config
+except ImportError:
+    sys.stderr.write("You need to configure the config.py file. Copy config.py.sample to config.py, then edit.\n")
+    sys.exit(1)
+
 
 echo_position = False
+threads = []
 
-def getch():  # getchar(), getc(stdin)  #PYCHOK flake
+# Yeah, predictable world writeable filename location. Pfft. Whatevs.
+sockfile = '/tmp/gogomovietwit'
+
+
+class GogoMovieTwitListener(StreamListener):
+ 
+    def on_data(self, data):
+        try:
+            tweet=json.loads(data)
+
+            if tweet["retweeted"]:
+                return False
+
+            print "\n" + tweet["text"]
+            sendmessage(tweet["text"])
+            time.sleep(5)
+
+            return True
+
+        except BaseException as e:
+            print("Error on_data: %s" % str(e))
+        return True
+ 
+    def on_error(self, status):
+        print(status)
+        return True
+
+
+# Sends a message to the given socket
+def sendmessage(message):
+    s = socket.socket(socket.AF_UNIX)
+    s.settimeout(1)
+    s.connect(sockfile)
+    s.send(message)
+    s.close()
+
+
+def getch():
     fd = sys.stdin.fileno()
     old = termios.tcgetattr(fd)
     try:
@@ -76,11 +128,47 @@ def toggle_echo_position():
     echo_position = not echo_position
 
 
+def serverproc(player):
+        # Remove the socket file if it already exists
+        if os.path.exists(sockfile):
+            os.remove(sockfile)
+
+        #print "Opening socket..."
+        server = socket.socket( socket.AF_UNIX, socket.SOCK_STREAM )
+        server.bind(sockfile)
+        server.listen(5)
+        
+        #print "Listening..."
+        while True:
+            conn, addr = server.accept()
+            #print 'Accepted connection'
+
+            while True:
+                data = conn.recv(1024)
+                if not data:
+                    break
+                else:
+                    #print "-" * 20
+                    #print data
+                    # Write overlay marquee content
+                    player.video_set_marquee_string(VideoMarqueeOption.Text, str_to_bytes(data))
+
+def clientproc():
+    ### Twitter parsing
+    auth = OAuthHandler(config.consumer_key, config.consumer_secret)
+    auth.set_access_token(config.access_token, config.access_secret)
+
+    twitter_stream = Stream(auth, GogoMovieTwitListener())
+    twitter_stream.filter(track=['#gogomovietwit'])
+
+    # Can this exit? XXX
+    while True:
+        time.sleep(1)
+
+
 if __name__ == '__main__':
 
     if sys.argv[1:] and sys.argv[1] not in ('-h', '--help'):
-
-        ### Kick off background job to get Twitter messages
 
         movie = os.path.expanduser(sys.argv[1])
         if not os.access(movie, os.R_OK):
@@ -95,25 +183,29 @@ if __name__ == '__main__':
                                                        __version__,
                                                        libvlc_get_version()))
             sys.exit(1)
+
         player = instance.media_player_new()
         player.set_media(media)
-        player.play()
+
+        ### Kick off background job to handle server messages
+        t = threading.Thread(target=serverproc, args=(player,))
+        threads.append(t)
+        t.daemon=True
+        t.start()
+
+        ### Kick off background job to get Twitter messages
+        t = threading.Thread(target=clientproc)
+        threads.append(t)
+        t.daemon=True
+        t.start()
 
         # Some marquee examples.  Marquee requires '--sub-source marq' in the
         # Instance() call above.  See <http://www.videolan.org/doc/play-howto/en/ch04.html>
         player.video_set_marquee_int(VideoMarqueeOption.Enable, 1)
         player.video_set_marquee_int(VideoMarqueeOption.Size, 24)  # pixels
         player.video_set_marquee_int(VideoMarqueeOption.Position, Position.Bottom)
-        if True:  # only one marquee can be specified
-            player.video_set_marquee_int(VideoMarqueeOption.Timeout, 5000)  # millisec, 0==forever
-            t = media.get_mrl()  # movie
-        else:  # update marquee text periodically
-            player.video_set_marquee_int(VideoMarqueeOption.Timeout, 0)  # millisec, 0==forever
-            player.video_set_marquee_int(VideoMarqueeOption.Refresh, 1000)  # millisec (or sec?)
-            t = 'Hello, World'
-        player.video_set_marquee_string(VideoMarqueeOption.Text, str_to_bytes(t))
-        time.sleep(8)
-        player.video_set_marquee_string(VideoMarqueeOption.Text, str_to_bytes("Family Fued"))
+        player.video_set_marquee_int(VideoMarqueeOption.Timeout, 5000)  # millisec, 0==forever
+        player.video_set_marquee_int(VideoMarqueeOption.Refresh, 1000)  # millisec (or sec?)
 
         keybindings = {
             ' ': player.pause,
@@ -126,10 +218,15 @@ if __name__ == '__main__':
             'p': toggle_echo_position,
             'q': quit_app,
             '?': print_help,
+            'h': print_help,
             }
 
-
         print('Press q to quit, ? to get help.%s' % os.linesep)
+
+        # Start playing the video
+        player.play()
+        sendmessage('gogomovietwit')
+
         while True:
             k = getch()
             print('> %s' % k)
