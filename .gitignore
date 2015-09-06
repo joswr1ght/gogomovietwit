@@ -1,4 +1,4 @@
 config.py
-sledding.mov
-tweepy1.py
+*.mov
+*.mp4
 *.pyc

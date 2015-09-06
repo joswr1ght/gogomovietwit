@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 from vlc import *
 import sys
@@ -10,6 +11,7 @@ import socket
 import threading
 import tweepy
 import json
+import string
 from tweepy import OAuthHandler
 from tweepy import Stream
 from tweepy.streaming import StreamListener
@@ -20,8 +22,6 @@ except ImportError:
     sys.stderr.write("You need to configure the config.py file. Copy config.py.sample to config.py, then edit.\n")
     sys.exit(1)
 
-
-echo_position = False
 threads = []
 
 # Yeah, predictable world writeable filename location. Pfft. Whatevs.
@@ -37,8 +37,13 @@ class GogoMovieTwitListener(StreamListener):
             if tweet["retweeted"]:
                 return False
 
-            print "\n" + tweet["text"]
-            sendmessage(tweet["text"])
+            #print "\n" + tweet["text"]
+
+            #print json.dumps(tweet, sort_keys=True, indent=4, separators=(',', ': '))
+            # Remove hashtag
+            text = filter(lambda x: x in string.printable, tweet["text"])
+            text = text.replace(config.hashtag, '')
+            sendmessage(text)
             time.sleep(5)
 
             return True
@@ -74,6 +79,17 @@ def getch():
 def mspf():
     """Milliseconds per frame."""
     return int(1000 // (player.get_fps() or 25))
+
+def print_version():
+    """Print libvlc version"""
+    try:
+        print('Build date: %s (%#x)' % (build_date, hex_version()))
+        print('LibVLC version: %s (%#x)' % (bytes_to_str(libvlc_get_version()), libvlc_hex_version()))
+        print('LibVLC compiler: %s' % bytes_to_str(libvlc_get_compiler()))
+        if plugin_path:
+            print('Plugin path: %s' % plugin_path)
+    except:
+        print('Error: %s' % sys.exc_info()[1])
 
 def print_info():
     """Print information about the media"""
@@ -122,11 +138,6 @@ def quit_app():
     """Stop and exit"""
     sys.exit(0)
 
-def toggle_echo_position():
-    """Toggle echoing of media position"""
-    global echo_position
-    echo_position = not echo_position
-
 
 def serverproc(player):
         # Remove the socket file if it already exists
@@ -159,7 +170,7 @@ def clientproc():
     auth.set_access_token(config.access_token, config.access_secret)
 
     twitter_stream = Stream(auth, GogoMovieTwitListener())
-    twitter_stream.filter(track=['#gogomovietwit'])
+    twitter_stream.filter(track=[config.hashtag])
 
     # Can this exit? XXX
     while True:
@@ -199,11 +210,9 @@ if __name__ == '__main__':
         t.daemon=True
         t.start()
 
-        # Some marquee examples.  Marquee requires '--sub-source marq' in the
-        # Instance() call above.  See <http://www.videolan.org/doc/play-howto/en/ch04.html>
         player.video_set_marquee_int(VideoMarqueeOption.Enable, 1)
-        player.video_set_marquee_int(VideoMarqueeOption.Size, 24)  # pixels
-        player.video_set_marquee_int(VideoMarqueeOption.Position, Position.Bottom)
+        player.video_set_marquee_int(VideoMarqueeOption.Size, 18)  # pixels
+        player.video_set_marquee_int(VideoMarqueeOption.Position, Position.Bottom+Position.Left)
         player.video_set_marquee_int(VideoMarqueeOption.Timeout, 5000)  # millisec, 0==forever
         player.video_set_marquee_int(VideoMarqueeOption.Refresh, 1000)  # millisec (or sec?)
 
@@ -215,7 +224,6 @@ if __name__ == '__main__':
             ',': frame_backward,
             'f': player.toggle_fullscreen,
             'i': print_info,
-            'p': toggle_echo_position,
             'q': quit_app,
             '?': print_help,
             'h': print_help,
@@ -225,7 +233,7 @@ if __name__ == '__main__':
 
         # Start playing the video
         player.play()
-        sendmessage('gogomovietwit')
+        sendmessage('gogomovietwit - watching hashtag %s'%config.hashtag)
 
         while True:
             k = getch()
