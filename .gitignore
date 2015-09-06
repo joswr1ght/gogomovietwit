@@ -2,3 +2,4 @@ config.py
 *.mov
 *.mp4
 *.pyc
+*.un~

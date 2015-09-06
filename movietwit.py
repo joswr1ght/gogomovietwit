@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from vlc import *
 import sys
 import os
 import time
@@ -12,9 +11,13 @@ import threading
 import tweepy
 import json
 import string
+import re
+import HTMLParser
 from tweepy import OAuthHandler
 from tweepy import Stream
 from tweepy.streaming import StreamListener
+from PIL import ImageFont
+from vlc import *
 
 try:
     import config
@@ -26,35 +29,77 @@ threads = []
 
 # Yeah, predictable world writeable filename location. Pfft. Whatevs.
 sockfile = '/tmp/gogomovietwit'
+FONTSIZE=18
 
 
 class GogoMovieTwitListener(StreamListener):
+
+    def __init__(self, font, fontsize, videowidth):
+            self.font = ImageFont.truetype(font, fontsize)
+            self.vidw = videowidth
  
     def on_data(self, data):
         try:
+            #print "\n" + "-"*80
+            print data
+
             tweet=json.loads(data)
 
-            if tweet["retweeted"]:
-                return False
+            # HTML parse ASCII only
+            text = HTMLParser.HTMLParser().unescape(tweet["text"].encode('ascii', 'ignore'))
+            # Remove hashtag, case insensitive (matching Tweepy stream)
+            hashtag = re.compile(re.escape(config.hashtag), re.IGNORECASE)
+            text = re.sub(hashtag, "", text)
+            # Remove URLs
+            text = re.sub(re.compile(r'((https?://[^\s<>"]+|www\.[^\s<>"]+))',re.DOTALL), "", text)
+            # Remove newlines
+            text = text.replace("\n", '')
 
-            #print "\n" + tweet["text"]
+            # Skip RT's if configured to do so
+            if config.skiprt:
+                if tweet["retweeted"]:
+                    return False
+                if "RT" in re.split("(?:(?:[^a-zA-Z]+')|(?:'[^a-zA-Z]+))|(?:[^a-zA-Z']+)", text):
+                    return False
 
-            #print json.dumps(tweet, sort_keys=True, indent=4, separators=(',', ': '))
-            # Remove hashtag
-            text = filter(lambda x: x in string.printable, tweet["text"])
-            text = text.replace(config.hashtag, '')
-            sendmessage(text)
+            name = tweet["user"]["screen_name"]
+
+            # Using known font and font size, wrap text to fix on screen
+            #text = wrap_text(text)
+
+            if config.anonmode:
+                sendmessage("%s"%(text))
+            else:
+                sendmessage("%s: %s"%(name, text))
             time.sleep(5)
 
             return True
 
-        except BaseException as e:
-            print("Error on_data: %s" % str(e))
+        except Exception, e:
+            print('Error on_data: %s' % sys.exc_info()[1])
+
         return True
  
     def on_error(self, status):
-        print(status)
+        print "Stream error:",
+        print status
         return True
+
+    def on_disconnect(self, notice):
+        """Called when twitter sends a disconnect notice
+    
+        Disconnect codes are listed here:
+        https://dev.twitter.com/docs/streaming-apis/messages#Disconnect_messages_disconnect
+        """
+        return
+
+    def wrap_text(self, text): 
+       words=text.split(" ")
+       start = stop = 0
+       while stop < len(words):
+           pass
+
+
 
 
 # Sends a message to the given socket
@@ -168,13 +213,19 @@ def clientproc():
     ### Twitter parsing
     auth = OAuthHandler(config.consumer_key, config.consumer_secret)
     auth.set_access_token(config.access_token, config.access_secret)
-
-    twitter_stream = Stream(auth, GogoMovieTwitListener())
-    twitter_stream.filter(track=[config.hashtag])
-
-    # Can this exit? XXX
     while True:
-        time.sleep(1)
+        vidwidth=720 # TODO: Figure out dynamic movie width
+        twitter_stream = Stream(auth, GogoMovieTwitListener("FreeSans.ttf", FONTSIZE, vidwidth), timeout=60)
+
+        try:
+            twitter_stream.filter(track=[config.hashtag])
+        except Exception, e:
+            print "Error:"
+            print e.__doc__
+            print e.message
+            print "Restarting stream."
+        time.sleep(3)
+
 
 
 if __name__ == '__main__':
@@ -211,7 +262,7 @@ if __name__ == '__main__':
         t.start()
 
         player.video_set_marquee_int(VideoMarqueeOption.Enable, 1)
-        player.video_set_marquee_int(VideoMarqueeOption.Size, 18)  # pixels
+        player.video_set_marquee_int(VideoMarqueeOption.Size, FONTSIZE)  # pixels
         player.video_set_marquee_int(VideoMarqueeOption.Position, Position.Bottom+Position.Left)
         player.video_set_marquee_int(VideoMarqueeOption.Timeout, 5000)  # millisec, 0==forever
         player.video_set_marquee_int(VideoMarqueeOption.Refresh, 1000)  # millisec (or sec?)
@@ -229,8 +280,7 @@ if __name__ == '__main__':
             'h': print_help,
             }
 
-        print('Press q to quit, ? to get help.%s' % os.linesep)
-
+        print_help()
         # Start playing the video
         player.play()
         sendmessage('gogomovietwit - watching hashtag %s'%config.hashtag)

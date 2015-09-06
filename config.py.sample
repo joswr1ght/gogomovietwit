@@ -3,4 +3,6 @@ consumer_secret = ''
 access_token = ''
 access_secret = ''
 
+skiprt = True
+anonmode = False
 hashtag = '#movietwit'

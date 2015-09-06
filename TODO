@@ -3,3 +3,5 @@ Dynamic duration of marquee based on content-length
 Experiment with size of text on screen
 Add on-screen VLC controls as well.
 Fix line breaking
+URL decode
+Option to remove leading "RT's"
