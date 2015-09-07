@@ -13,6 +13,7 @@ import json
 import string
 import re
 import HTMLParser
+import tempfile
 from tweepy import OAuthHandler
 from tweepy import Stream
 from tweepy.streaming import StreamListener
@@ -26,9 +27,7 @@ except ImportError:
     sys.exit(1)
 
 threads = []
-
-# Yeah, predictable world writeable filename location. Pfft. Whatevs.
-sockfile = '/tmp/gogomovietwit'
+sockfile = tempfile._get_default_tempdir() + "/gogomovietwit" + next(tempfile._get_candidate_names())
 FONTSIZE=18
 
 
@@ -41,7 +40,7 @@ class GogoMovieTwitListener(StreamListener):
     def on_data(self, data):
         try:
             #print "\n" + "-"*80
-            print data
+            #print data
 
             tweet=json.loads(data)
 
@@ -181,6 +180,7 @@ def print_help():
 
 def quit_app():
     """Stop and exit"""
+    os.remove(sockfile)
     sys.exit(0)
 
 
@@ -293,7 +293,6 @@ if __name__ == '__main__':
             elif k.isdigit():
                  # jump to fraction of the movie.
                 player.set_position(float('0.'+k))
-            ### Check IPC for messages to display next
 
     else:
         print('Usage: %s <movie_filename>' % sys.argv[0])
