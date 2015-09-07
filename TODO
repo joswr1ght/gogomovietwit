@@ -1,7 +1,7 @@
-"Anonymity" mode where @username is not displayed
 Dynamic duration of marquee based on content-length
-Experiment with size of text on screen
 Add on-screen VLC controls as well.
 Fix line breaking
-URL decode
-Option to remove leading "RT's"
+  -- Still broken. I manually add newlines for wrapping, but VLC still treats
+     the entire text (including my newlines) for wrapping evaluation. My
+     newline wrapping fixes content lost on right edge of screen, but VLC
+     then puts the next word on its own line.

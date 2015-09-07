@@ -4,7 +4,7 @@ access_token = ''
 access_secret = ''
 
 logfile="movietwit.log"
-
+tweetdur=6
 skiprt = True
 anonmode = False
 

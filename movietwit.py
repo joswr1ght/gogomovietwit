@@ -31,6 +31,7 @@ sockfile = tempfile._get_default_tempdir() + "/gogomovietwit" + next(tempfile._g
 FONTSIZE=18
 
 
+# TODO: This class has external dependencies
 class GogoMovieTwitListener(StreamListener):
 
     def __init__(self, font, fontsize, videowidth):
@@ -60,6 +61,7 @@ class GogoMovieTwitListener(StreamListener):
             if config.skiprt:
                 if tweet["retweeted"]:
                     return False
+                # Split tweet into words (by anything but alphabetic characters) to isolate "RT"
                 if "RT" in re.split("(?:(?:[^a-zA-Z]+')|(?:'[^a-zA-Z]+))|(?:[^a-zA-Z']+)", text):
                     return False
 
@@ -74,7 +76,7 @@ class GogoMovieTwitListener(StreamListener):
                 sendmessage("%s"%self.wrap_text(name + ": " + text))
 
             # Tweet display duration
-            time.sleep(5)
+            time.sleep(config.tweetdur)
 
             return True
 
