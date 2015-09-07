@@ -52,7 +52,9 @@ class GogoMovieTwitListener(StreamListener):
             # Remove URLs
             text = re.sub(re.compile(r'((https?://[^\s<>"]+|www\.[^\s<>"]+))',re.DOTALL), "", text)
             # Remove newlines
-            text = text.replace("\n", '')
+            log(text)
+            text = text.replace("\n", '').replace("\r", '')
+            log(text)
 
             # Skip RT's if configured to do so
             if config.skiprt:
@@ -64,12 +66,14 @@ class GogoMovieTwitListener(StreamListener):
             name = tweet["user"]["screen_name"]
 
             # Using known font and font size, wrap text to fix on screen
-            #text = wrap_text(text)
+            text = self.wrap_text(text)
 
             if config.anonmode:
-                sendmessage("%s"%(text))
+                sendmessage("%s"%self.wrap_text(text))
             else:
-                sendmessage("%s: %s"%(name, text))
+                sendmessage("%s"%self.wrap_text(name + ": " + text))
+
+            # Tweet display duration
             time.sleep(5)
 
             return True
@@ -93,11 +97,20 @@ class GogoMovieTwitListener(StreamListener):
         return
 
     def wrap_text(self, text): 
-       words=text.split(" ")
-       start = stop = 0
-       while stop < len(words):
-           pass
+        """Wrap the text to fit video width in pixels"""
+        #log("DEBUG Before Wrap: %s\n"%text)
+        wrappedtext=""
+        words=text.split(" ")
+        start = stop = 0
+        while stop < len(words):
+            stop+=1
+            if self.font.getsize(" ".join(words[start:stop]))[0] > self.vidw:
+                wrappedtext += " ".join(words[start:stop-1]) + "\n"
+                start = stop-1
+        wrappedtext += " ".join(words[start:stop])
 
+        #log("DEBUG  After Wrap: %s\n"%wrappedtext)
+        return wrappedtext
 
 
 
@@ -214,8 +227,8 @@ def clientproc():
     auth = OAuthHandler(config.consumer_key, config.consumer_secret)
     auth.set_access_token(config.access_token, config.access_secret)
     while True:
-        vidwidth=720 # TODO: Figure out dynamic movie width
-        twitter_stream = Stream(auth, GogoMovieTwitListener("FreeSans.ttf", FONTSIZE, vidwidth), timeout=60)
+        vidwidth=600 # TODO: Figure out dynamic movie width
+        twitter_stream = Stream(auth, GogoMovieTwitListener("FreeSansBold.ttf", FONTSIZE, vidwidth), timeout=60)
 
         try:
             twitter_stream.filter(track=[config.hashtag])
@@ -226,7 +239,9 @@ def clientproc():
             print "Restarting stream."
         time.sleep(3)
 
-
+def log(message):
+    with open(config.logfile, "a") as f:
+        f.write(message + "\n")
 
 if __name__ == '__main__':
 
