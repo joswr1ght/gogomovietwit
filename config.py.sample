@@ -1,11 +1,26 @@
+# You'll need to visit apps.twitter.com and obtain these values
 consumer_key = ''
 consumer_secret = ''
 access_token = ''
 access_secret = ''
 
-logfile="movietwit.log"
+# This is the hashtag to follow, use spaces for multiple hashtags
+hashtag = '#movietwit'
+
+# This is the duration that a tweet is displayed on the marquee
 tweetdur=6
+
+# When true, retweets or tweets with RT outside of a word are skipped
 skiprt = True
+
+# When true, the Twitter username is omitted from the marquee
 anonmode = False
 
-hashtag = '#movietwit'
+# When true, the dynamicfilterfile is consulted for keywords that should
+# not be displayed on the marquee. This is dynamic, and new entries can
+# be added-to/removed-from while movietwit is running.
+dynamicfilter = True
+dynamicfilterfile = "filtered.txt"
+
+# Default filename for logging/debug/troubleshooting
+logfile="movietwit.log"

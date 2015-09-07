@@ -1,0 +1,3 @@
+; Filtered keywords, one word per line. If the word in the tweet is in this
+; file, it isn't displayed on the marquee. This file can be changed at
+; runtime. Lines with a leading ; are ignored. Filter is case-insensitive.

@@ -37,6 +37,18 @@ class GogoMovieTwitListener(StreamListener):
     def __init__(self, font, fontsize, videowidth):
             self.font = ImageFont.truetype(font, fontsize)
             self.vidw = videowidth
+
+    def filter_content(self, tweet):
+        """ Returns True when the content should be filtered """
+        with open(config.dynamicfilterfile, "r") as f:
+            for line in f:
+                if line[0] == ";":
+                    continue
+                log(line.lower())
+                log(tweet.lower())
+                if line.lower().rstrip() in tweet.lower():
+                    return True
+        return False
  
     def on_data(self, data):
         try:
@@ -66,6 +78,10 @@ class GogoMovieTwitListener(StreamListener):
                     return False
 
             name = tweet["user"]["screen_name"]
+
+            if config.dynamicfilter:
+                if self.filter_content(name + " " + text):
+                    return False
 
             # Using known font and font size, wrap text to fix on screen
             text = self.wrap_text(text)
